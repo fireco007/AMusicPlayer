@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- TabHost必须包含一个 TabWidget和一个FrameLayout,
+ 其中TabWidget是tab按钮, FrameLayout对应tab的内容view-->
+
+<TabHost
+    android:id="@+id/tabhost"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout android:orientation="vertical"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent">
+
+        <FrameLayout
+            android:id="@android:id/tabcontent"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_weight="1.0"
+            >
+            <!--加上这个layout_weight="1.0"就不遮挡下面的TabWidget了，为啥？-->
+            
+            <ListView
+                android:id="@+id/view1"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:id="@+id/view2"
+                android:text="todo:playlist"/>
+
+            <TextView
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:id="@+id/view3"
+                android:text="todo:mine"/>
+
+        </FrameLayout>
+
+
+        <TabWidget
+            android:orientation="horizontal"
+            android:id="@android:id/tabs"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+             />
+
+    </LinearLayout>
+    
+</TabHost>
