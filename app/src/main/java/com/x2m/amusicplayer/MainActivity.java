@@ -5,10 +5,16 @@ import android.app.Service;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.os.AsyncTask;
+import android.graphics.drawable.AnimationDrawable;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.util.Log;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TabHost;
 
@@ -22,7 +28,35 @@ public class MainActivity extends Activity {
 
     private ListView musicListView;
     private MusicListViewAdapter adapter;
+    private TabHost.TabSpec localTab;
 
+    //扫描时播放的动画的控件
+    private LinearLayout animLayout;
+    private AnimationDrawable loadFileAnim;
+    private ImageView aniDis;
+
+    //接受消息通知
+    public static final int FILE_LOAD_FINISH = 1;
+    public static final int FILE_LOAD_FAILED = 2;
+
+    private Handler mainUIhandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+
+            switch (msg.what){
+                case FILE_LOAD_FINISH:
+                    localTab.setContent(R.id.musicList);
+                    animLayout.setVisibility(View.GONE);
+                    musicListView.setVisibility(View.VISIBLE);
+                    break;
+                default:
+                    break;
+            }
+
+
+            super.handleMessage(msg);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,22 +66,31 @@ public class MainActivity extends Activity {
         TabHost tabHost = (TabHost)findViewById(R.id.tabhost);
         tabHost.setup();
 
+        //加载动画播放
+        localTab = tabHost.newTabSpec("tab1");
+        localTab.setIndicator("本地").setContent(R.id.firstView);
+        animLayout = (LinearLayout)findViewById(R.id.firstView);
+        aniDis = (ImageView)findViewById(R.id.loadAnim);
+        loadFileAnim = (AnimationDrawable)getResources().getDrawable(R.drawable.load_anim);
+        aniDis.setBackgroundDrawable(loadFileAnim);
+        loadFileAnim.start();
 
-        tabHost.addTab(tabHost.newTabSpec("tab1").setIndicator("本地").setContent(R.id.view1));
+        //绑定底部tab和中间显示的view
+        tabHost.addTab(localTab);
 
         tabHost.addTab(tabHost.newTabSpec("tab2").setIndicator("歌单").setContent(R.id.view2));
 
         tabHost.addTab(tabHost.newTabSpec("tab3").setIndicator("我的").setContent(R.id.view3));
 
-        musicListView = (ListView)findViewById(R.id.view1);
-
-        bindPlayService();
-
-        adapter = new MusicListViewAdapter(this);
+        //初始化歌曲列表
+        musicListView = (ListView)findViewById(R.id.musicList);
+        adapter = new MusicListViewAdapter(this, mainUIhandler);
         musicListView.setAdapter(adapter);
+        musicListView.setVisibility(View.GONE);
+        adapter.rescanLocalFile(Environment.getExternalStorageDirectory().getAbsolutePath());
 
-
-
+        //绑定服务
+        bindPlayService();
     }
 
     private IPlayerAidlInf playSrvInf = null;

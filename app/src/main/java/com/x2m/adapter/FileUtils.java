@@ -17,7 +17,7 @@ public class FileUtils {
         File sdCardFile = new File(Environment.getExternalStorageDirectory().getAbsolutePath());
         String path = sdCardFile.getAbsolutePath();
 
-        List<String> fileList = new ArrayList<String>();
+        List<String> fileList = new ArrayList<>();
 
         String result = "";
 
@@ -33,6 +33,35 @@ public class FileUtils {
 
         return fileList;
     }
+
+    public static void searchFileRecur(String rootPath, String keyword, List<String> outFileList) {
+
+        File rootFile = new File(rootPath);
+        if (rootFile.isFile())
+            return;
+
+        File[] files = rootFile.listFiles();
+        for (File f : files) {
+
+            if (f.isDirectory()) {
+                searchFileRecur(f.getPath(), keyword, outFileList);
+            } else {
+
+                //支持多个格式，形如：mp3,ape,flac
+                String ptnList[] = keyword.toLowerCase().split(",");
+                for (String ptn : ptnList) {
+                    //判断文件名f中是否包含keyword
+                    if (f.getName().toLowerCase().endsWith(ptn)) {
+                        //f.getPath()返回文件的路径
+                        outFileList.add(f.getPath());
+                    }
+                }
+            }
+        }
+
+        return ;
+    }
+
 
     /**
      * 遍历 "system/etc/vold.fstab” 文件，获取全部的Android的挂载点信息

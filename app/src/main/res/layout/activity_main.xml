@@ -4,50 +4,71 @@
  其中TabWidget是tab按钮, FrameLayout对应tab的内容view-->
 
 <TabHost
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tabhost"
     android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    xmlns:android="http://schemas.android.com/apk/res/android">
+    android:layout_height="fill_parent">
 
-    <LinearLayout android:orientation="vertical"
+    <LinearLayout
         android:layout_width="fill_parent"
-        android:layout_height="fill_parent">
+        android:layout_height="fill_parent"
+        android:orientation="vertical">
 
         <FrameLayout
             android:id="@android:id/tabcontent"
             android:layout_width="fill_parent"
             android:layout_height="fill_parent"
-            android:layout_weight="1.0"
-            >
+            android:layout_weight="1.0">
             <!--加上这个layout_weight="1.0"就不遮挡下面的TabWidget了，为啥？-->
-            
+
             <ListView
-                android:id="@+id/view1"
+                android:id="@+id/musicList"
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content" />
 
-            <TextView
+            <!--搜索音乐时的加载动画和提示信息-->
+            <LinearLayout
+                android:id="@+id/firstView"
+                android:layout_marginTop="100dp"
                 android:layout_width="fill_parent"
                 android:layout_height="fill_parent"
-                android:id="@+id/view2"
-                android:text="todo:playlist"/>
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/loadAnim"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="正在扫描本地音乐..."
+                    android:layout_gravity="center"/>
+
+            </LinearLayout>
 
             <TextView
+                android:id="@+id/view2"
                 android:layout_width="fill_parent"
                 android:layout_height="fill_parent"
+                android:text="todo:playlist" />
+
+            <TextView
                 android:id="@+id/view3"
-                android:text="todo:mine"/>
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:text="todo:mine" />
 
         </FrameLayout>
 
 
         <TabWidget
-            android:orientation="horizontal"
             android:id="@android:id/tabs"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-             />
+            android:orientation="horizontal" />
 
     </LinearLayout>
-    
+
 </TabHost>
