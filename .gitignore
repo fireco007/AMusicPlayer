@@ -5,3 +5,12 @@
 .DS_Store
 /build
 /captures
+.idea/compiler.xml
+.idea/encodings.xml
+.idea/gradle.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/misc.xml
+.idea/dictionaries/Administrator.xml
+.idea/runConfigurations.xml
+AMusicPlayer.iml

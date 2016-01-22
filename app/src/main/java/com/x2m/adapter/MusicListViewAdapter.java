@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.RemoteException;
 import android.util.Log;
+import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +17,18 @@ import com.x2m.amusicplayer.MainActivity;
 import com.x2m.amusicplayer.R;
 import com.x2m.service.IPlayerAidlInf;
 
+import org.jaudiotagger.audio.AudioFile;
+import org.jaudiotagger.audio.AudioFileIO;
+import org.jaudiotagger.audio.exceptions.CannotReadException;
+import org.jaudiotagger.audio.exceptions.InvalidAudioFrameException;
+import org.jaudiotagger.audio.exceptions.ReadOnlyFileException;
+import org.jaudiotagger.tag.FieldKey;
+import org.jaudiotagger.tag.Tag;
+import org.jaudiotagger.tag.TagException;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.x2m.adapter.FileUtils.searchFile;
@@ -29,14 +42,13 @@ public class MusicListViewAdapter extends BaseAdapter {
     private static final String TAG = "MusicListViewAdapter";
 
     private LayoutInflater mInflater;//得到一个LayoutInfalter对象用来导入布局 /*构造函数*/
-    private List<String> mFileList;
+    private List<Pair<String, Tag>> mFileList = new ArrayList<>();
     private IPlayerAidlInf playSrvInf;
     private Handler notifyHandler;
 
     public MusicListViewAdapter(Context context, Handler uiHandler) {
         this.mInflater = LayoutInflater.from(context);
         notifyHandler = uiHandler;
-        mFileList = searchFile(".mp3");
     }
 
     public void setPlayInf(IPlayerAidlInf playInf) {
@@ -79,20 +91,21 @@ public class MusicListViewAdapter extends BaseAdapter {
         }
 
         /*设置TextView显示的内容，即我们存放在动态数组中的数据*/
-        final String fullPath = mFileList.get(position);
-        Log.i(TAG, fullPath);
-        String fullName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
+        final Pair<String,Tag> meta = mFileList.get(position);
+        Log.i(TAG, meta.first);
 
-        String[] params = fullName.split("-");
-        if (params.length < 2) {
-            holder.title.setText("未知");
-            holder.text.setText(params[0].trim());
+        //see http://www.jthink.net/jaudiotagger/examples_read.jsp for more tags
+        String artist = meta.second.getFirst(FieldKey.ARTIST);
+        String title = meta.second.getFirst(FieldKey.TITLE);
+
+        if (artist.isEmpty() || title.isEmpty()) {
+            title = meta.first.substring(meta.first.lastIndexOf("/") + 1);
+            holder.title.setText(title);
+            holder.text.setText("未知");
         } else {
-            holder.title.setText(params[1].trim());
-            holder.text.setText(params[0].trim());
+            holder.title.setText(title);
+            holder.text.setText(artist);
         }
-
-
 
         /*为Button添加点击事件*/
         holder.bt.setOnClickListener(new View.OnClickListener() {
@@ -105,7 +118,7 @@ public class MusicListViewAdapter extends BaseAdapter {
                 }
 
                 try {
-                    playSrvInf.play(fullPath);
+                    playSrvInf.play(meta.first);
                 } catch (RemoteException e) {
                     Log.e(TAG, e.toString());
                 }
@@ -121,7 +134,29 @@ public class MusicListViewAdapter extends BaseAdapter {
                 new Runnable() {
                     @Override
                     public void run() {
-                        FileUtils.searchFileRecur(path, ".mp3,.ape,.flac", mFileList);
+                        List<File> fileList = new ArrayList<>();
+
+                        FileUtils.searchFileRecur(path, ".mp3,.ape,.flac", fileList);
+
+                        for (File file : fileList) {
+                            try {
+                                AudioFile af = AudioFileIO.read(file);
+                                Tag tag = af.getTag();
+                                Pair<String, Tag> pair = new Pair<>(file.getAbsolutePath(), tag);
+                                mFileList.add(pair);
+                            } catch (CannotReadException e) {
+                                e.printStackTrace();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            } catch (TagException e) {
+                                e.printStackTrace();
+                            } catch (ReadOnlyFileException e) {
+                                e.printStackTrace();
+                            } catch (InvalidAudioFrameException e) {
+                                e.printStackTrace();
+                            }
+                        }
+
                         Message msg = new Message();
                         msg.what = MainActivity.FILE_LOAD_FINISH;
                         notifyHandler.sendMessage(msg);

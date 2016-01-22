@@ -34,7 +34,7 @@ public class FileUtils {
         return fileList;
     }
 
-    public static void searchFileRecur(String rootPath, String keyword, List<String> outFileList) {
+    public static void searchFileRecur(String rootPath, String keyword, List<File> outFileList) {
 
         File rootFile = new File(rootPath);
         if (rootFile.isFile())
@@ -53,7 +53,7 @@ public class FileUtils {
                     //判断文件名f中是否包含keyword
                     if (f.getName().toLowerCase().endsWith(ptn)) {
                         //f.getPath()返回文件的路径
-                        outFileList.add(f.getPath());
+                        outFileList.add(f);
                     }
                 }
             }
