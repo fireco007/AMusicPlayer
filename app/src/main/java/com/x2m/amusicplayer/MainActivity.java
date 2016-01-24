@@ -11,6 +11,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
@@ -21,6 +22,8 @@ import android.widget.TabHost;
 import com.x2m.adapter.MusicListViewAdapter;
 import com.x2m.service.IPlayerAidlInf;
 import com.x2m.service.PlayService;
+
+import java.lang.ref.WeakReference;
 
 public class MainActivity extends Activity {
 
@@ -39,24 +42,42 @@ public class MainActivity extends Activity {
     public static final int FILE_LOAD_FINISH = 1;
     public static final int FILE_LOAD_FAILED = 2;
 
-    private Handler mainUIhandler = new Handler() {
+    //修复 : The handler class should be static or leaks might occur
+    //参考 : http://www.cnblogs.com/zoejiaen/p/4580572.html
+    private MainUIHandler mainUIhandler = new MainUIHandler(this);
+    private static class MainUIHandler extends Handler {
+
+        private WeakReference<MainActivity> activity;
+
+        public MainUIHandler(MainActivity context) {
+            activity = new WeakReference<>(context);
+        }
+
         @Override
         public void handleMessage(Message msg) {
 
             switch (msg.what){
                 case FILE_LOAD_FINISH:
-                    localTab.setContent(R.id.musicList);
-                    animLayout.setVisibility(View.GONE);
-                    musicListView.setVisibility(View.VISIBLE);
+
+                    MainActivity temp = activity.get();
+                    if (temp != null)
+                        temp.loadFileFinished();
+
                     break;
                 default:
                     break;
             }
 
-
             super.handleMessage(msg);
         }
-    };
+    }
+
+    //music文件加载完成
+    private void loadFileFinished() {
+        localTab.setContent(R.id.musicList);
+        animLayout.setVisibility(View.GONE);
+        musicListView.setVisibility(View.VISIBLE);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,8 +92,10 @@ public class MainActivity extends Activity {
         localTab.setIndicator("本地").setContent(R.id.firstView);
         animLayout = (LinearLayout)findViewById(R.id.firstView);
         aniDis = (ImageView)findViewById(R.id.loadAnim);
-        loadFileAnim = (AnimationDrawable)getResources().getDrawable(R.drawable.load_anim);
-        aniDis.setBackgroundDrawable(loadFileAnim);
+
+        //getResource().getDrawable和setBackgroundDrawable 过时
+        loadFileAnim = (AnimationDrawable)ContextCompat.getDrawable(this, R.drawable.load_anim);
+        aniDis.setBackground(ContextCompat.getDrawable(this, R.drawable.load_anim));
         loadFileAnim.start();
 
         //绑定底部tab和中间显示的view
@@ -87,7 +110,7 @@ public class MainActivity extends Activity {
         adapter = new MusicListViewAdapter(this, mainUIhandler);
         musicListView.setAdapter(adapter);
         musicListView.setVisibility(View.GONE);
-        adapter.rescanLocalFile(Environment.getExternalStorageDirectory().getAbsolutePath());
+        adapter.loadData();
 
         //绑定服务
         bindPlayService();

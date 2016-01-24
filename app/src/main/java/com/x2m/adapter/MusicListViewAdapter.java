@@ -1,6 +1,9 @@
 package com.x2m.adapter;
 
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.os.RemoteException;
@@ -15,6 +18,10 @@ import android.widget.TextView;
 
 import com.x2m.amusicplayer.MainActivity;
 import com.x2m.amusicplayer.R;
+import com.x2m.db.TB_Music;
+import com.x2m.db.dao.DaoMaster;
+import com.x2m.db.dao.DaoSession;
+import com.x2m.db.dao.TB_MusicDao;
 import com.x2m.service.IPlayerAidlInf;
 
 import org.jaudiotagger.audio.AudioFile;
@@ -31,6 +38,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.greenrobot.dao.query.QueryBuilder;
+
 import static com.x2m.adapter.FileUtils.searchFile;
 
 
@@ -41,14 +50,16 @@ public class MusicListViewAdapter extends BaseAdapter {
 
     private static final String TAG = "MusicListViewAdapter";
 
-    private LayoutInflater mInflater;//得到一个LayoutInfalter对象用来导入布局 /*构造函数*/
-    private List<Pair<String, Tag>> mFileList = new ArrayList<>();
-    private IPlayerAidlInf playSrvInf;
+    private LayoutInflater mInflater = null;//得到一个LayoutInfalter对象用来导入布局 /*构造函数*/
+    private List<TB_Music> mFileList = new ArrayList<>(); //避免第一次加载抛异常
+    private IPlayerAidlInf playSrvInf = null;
     private Handler notifyHandler;
+    private Context ctx;
 
     public MusicListViewAdapter(Context context, Handler uiHandler) {
         this.mInflater = LayoutInflater.from(context);
         notifyHandler = uiHandler;
+        ctx = context;
     }
 
     public void setPlayInf(IPlayerAidlInf playInf) {
@@ -91,21 +102,11 @@ public class MusicListViewAdapter extends BaseAdapter {
         }
 
         /*设置TextView显示的内容，即我们存放在动态数组中的数据*/
-        final Pair<String,Tag> meta = mFileList.get(position);
-        Log.i(TAG, meta.first);
+        final TB_Music music = mFileList.get(position);
 
-        //see http://www.jthink.net/jaudiotagger/examples_read.jsp for more tags
-        String artist = meta.second.getFirst(FieldKey.ARTIST);
-        String title = meta.second.getFirst(FieldKey.TITLE);
+        holder.title.setText(music.getTitle());
+        holder.text.setText(music.getArtist());
 
-        if (artist.isEmpty() || title.isEmpty()) {
-            title = meta.first.substring(meta.first.lastIndexOf("/") + 1);
-            holder.title.setText(title);
-            holder.text.setText("未知");
-        } else {
-            holder.title.setText(title);
-            holder.text.setText(artist);
-        }
 
         /*为Button添加点击事件*/
         holder.bt.setOnClickListener(new View.OnClickListener() {
@@ -118,7 +119,7 @@ public class MusicListViewAdapter extends BaseAdapter {
                 }
 
                 try {
-                    playSrvInf.play(meta.first);
+                    playSrvInf.play(music.getPath());
                 } catch (RemoteException e) {
                     Log.e(TAG, e.toString());
                 }
@@ -126,6 +127,22 @@ public class MusicListViewAdapter extends BaseAdapter {
         });
 
         return convertView;
+    }
+
+    public void loadData() {
+        DBUtils db = new DBUtils();
+        mFileList = db.getAllMusic();
+
+        if (mFileList == null || mFileList.size() <= 0) {
+            Log.i(TAG, "rescan device");
+            rescanLocalFile(Environment.getExternalStorageDirectory().getAbsolutePath());
+        } else {
+            Log.i(TAG, "load from app database");
+            Message msg = new Message();
+            msg.what = MainActivity.FILE_LOAD_FINISH;
+            notifyHandler.sendMessage(msg);
+        }
+
     }
 
     public void rescanLocalFile(final String path) {
@@ -137,25 +154,13 @@ public class MusicListViewAdapter extends BaseAdapter {
                         List<File> fileList = new ArrayList<>();
 
                         FileUtils.searchFileRecur(path, ".mp3,.ape,.flac", fileList);
+                        DBUtils db = new DBUtils();
 
                         for (File file : fileList) {
-                            try {
-                                AudioFile af = AudioFileIO.read(file);
-                                Tag tag = af.getTag();
-                                Pair<String, Tag> pair = new Pair<>(file.getAbsolutePath(), tag);
-                                mFileList.add(pair);
-                            } catch (CannotReadException e) {
-                                e.printStackTrace();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            } catch (TagException e) {
-                                e.printStackTrace();
-                            } catch (ReadOnlyFileException e) {
-                                e.printStackTrace();
-                            } catch (InvalidAudioFrameException e) {
-                                e.printStackTrace();
-                            }
+                            db.insertMusic2DB(file);
                         }
+
+                        mFileList = db.getAllMusic();
 
                         Message msg = new Message();
                         msg.what = MainActivity.FILE_LOAD_FINISH;
@@ -171,5 +176,58 @@ public class MusicListViewAdapter extends BaseAdapter {
         public TextView title;
         public TextView text;
         public Button bt;
+    }
+
+    public class DBUtils {
+
+        //数据库操作
+        private SQLiteOpenHelper dbHelper;
+        private SQLiteDatabase db;
+        private DaoMaster daoMaster;
+
+        public DBUtils() {
+            dbHelper = new DaoMaster.DevOpenHelper(ctx, "musicdb", null);
+            db = dbHelper.getWritableDatabase();
+            daoMaster = new DaoMaster(db);
+        }
+
+        public void insertMusic2DB(File file) {
+            DaoSession daoSession = daoMaster.newSession();
+            TB_MusicDao musicDao = daoSession.getTB_MusicDao();
+
+            String path = file.getAbsolutePath();
+            TB_Music music = new TB_Music();
+            music.setPath(path);
+
+            AudioFile af = null;
+            try {
+                af = AudioFileIO.read(file);
+                Tag tag = af.getTag();
+
+                //see http://www.jthink.net/jaudiotagger/examples_read.jsp for more tags
+                String artist = tag.getFirst(FieldKey.ARTIST);
+                String title = tag.getFirst(FieldKey.TITLE);
+                String album = tag.getFirst(FieldKey.ALBUM);
+                String type = tag.getFirst(FieldKey.TAGS);
+
+                music.setArtist(artist.length() <= 1 ? "未知" : artist);
+                music.setTitle(title.length() <= 1 ? path.substring(path.lastIndexOf("/") + 1) : title);
+                music.setAlbum(album);
+                music.setType(type);
+                music.setStatus(1);
+
+                musicDao.insert(music);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        }
+
+        public List<TB_Music> getAllMusic() {
+            DaoSession daoSession = daoMaster.newSession();
+            TB_MusicDao musicDao = daoSession.getTB_MusicDao();
+            QueryBuilder queryAll = musicDao.queryBuilder().where(TB_MusicDao.Properties.Status.ge(1));
+            return queryAll.list();
+        }
     }
 }
